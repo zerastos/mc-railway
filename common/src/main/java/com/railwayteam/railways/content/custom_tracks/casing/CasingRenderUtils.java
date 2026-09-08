@@ -64,8 +64,10 @@ import static com.railwayteam.railways.util.MathUtils.copy;
 public abstract class CasingRenderUtils {
 
     private static final HashMap<Pair<PartialModel, Block>, PartialModel> reTexturedModels = new HashMap<>();
+    private static final HashMap<PartialModel, SimpleModel> flywheelModels = new HashMap<>();
 
     public static void clearModelCache() {
+        flywheelModels.clear();
         reTexturedModels.clear();
         CRBlockPartials.registerCasingSpecs();
         Minecraft.getInstance().levelRenderer.allChanged();
@@ -187,14 +189,18 @@ public abstract class CasingRenderUtils {
 
     public static TransformedInstance makeCasingInstance(PartialModel baseModel, Block casingBlock, InstancerProvider instancerProvider) {
         PartialModel texturedPartial = reTexture(baseModel, casingBlock);
-        SimpleModel model = BakedModelBuilder.create(texturedPartial.get())
-                .materialFunc((renderType, shaded) ->
-					SimpleMaterial.builderOf(ModelUtil.getMaterial(RenderType.cutoutMipped(), shaded))
-						.light(LightShaders.FLAT)
-						.cardinalLightingMode(shaded ? CardinalLightingMode.CHUNK : CardinalLightingMode.OFF)
-						.build()
-				)
-                .build();
+
+        SimpleModel model = flywheelModels.computeIfAbsent(texturedPartial, partial ->
+                BakedModelBuilder.create(partial.get())
+                        .materialFunc((renderType, shaded) ->
+                                SimpleMaterial.builderOf(ModelUtil.getMaterial(RenderType.cutoutMipped(), shaded))
+                                        .light(LightShaders.FLAT)
+                                        .cardinalLightingMode(shaded ? CardinalLightingMode.CHUNK : CardinalLightingMode.OFF)
+                                        .build()
+                        )
+                        .build()
+        );
+
         return instancerProvider.instancer(InstanceTypes.TRANSFORMED, model)
                 .createInstance();
     }
