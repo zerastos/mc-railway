@@ -68,37 +68,48 @@ public abstract class ChunkMapMixin {
 	 * when they stop viewing a camera
 	 */
 	@Inject(method = "move", at = @At(value = "TAIL"))
-	private void railways$securitycraft$trackCameraLoadedChunks(ServerPlayer player, CallbackInfo callback) {
-		if (player.getCamera() instanceof ConductorEntity camera) {
-			if (!camera.hasSentChunks()) {
-				SectionPos oldPos = camera.oldSectionPos;
-				SectionPos pos = SectionPos.of(camera);
-				camera.oldSectionPos = pos;
+	private void railways$securitycraft$trackCameraLoadedChunks(
+			ServerPlayer player, CallbackInfo callback) {
+		if (!(player.getCamera() instanceof ConductorEntity camera) || camera.hasSentChunks()) {
+			return;
+		}
 
-				for (int i = pos.x() - viewDistance - 1; i <= pos.x() + viewDistance + 1; ++i) {
-					for (int j = pos.z() - viewDistance - 1; j <= pos.z() + viewDistance + 1; ++j) {
-						if (oldPos != null) { // if we are updating from a previous position, only load / unload relevant chunks
-							boolean wasLoaded = ChunkMap.isChunkInRange(i, j, oldPos.x(), oldPos.z(), viewDistance);
-							boolean load = ChunkMap.isChunkInRange(i, j, pos.x(), pos.z(), viewDistance);
-							if (wasLoaded != load) {
-								updateChunkTracking(player, new ChunkPos(i, j), new MutableObject<>(), wasLoaded, load);
-							}
-						} else if (ChunkMap.isChunkInRange(i, j, pos.x(), pos.z(), viewDistance))
-							updateChunkTracking(player, new ChunkPos(i, j), new MutableObject<>(), false, true);
+		SectionPos oldPos = camera.oldSectionPos;
+		SectionPos newPos = SectionPos.of(camera);
+		SectionPos playerPos = player.getLastSectionPos();
+		MutableObject<ClientboundLevelChunkWithLightPacket> packetCache = new MutableObject<>();
+
+		camera.oldSectionPos = newPos;
+
+		// Iterate the old area separately. This handles teleports larger than the
+		// view diameter, which the old new-position-only loop missed.
+		if (oldPos != null) {
+			for (int x = oldPos.x() - viewDistance - 1; x <= oldPos.x() + viewDistance + 1; x++) {
+				for (int z = oldPos.z() - viewDistance - 1; z <= oldPos.z() + viewDistance + 1; z++) {
+					boolean wasLoaded = ChunkMap.isChunkInRange(x, z, oldPos.x(), oldPos.z(), viewDistance);
+					boolean stillLoaded = ChunkMap.isChunkInRange(x, z, newPos.x(), newPos.z(), viewDistance);
+					boolean playerLoaded = ChunkMap.isChunkInRange(x, z, playerPos.x(), playerPos.z(), viewDistance);
+
+					if (wasLoaded && !stillLoaded && !playerLoaded) {
+						updateChunkTracking(player, new ChunkPos(x, z), packetCache, true, false);
 					}
 				}
-
-				camera.setHasSentChunks(true);
 			}
 		}
-		else if (ConductorEntity.hasRecentlyDismounted(player)) {
-			SectionPos pos = player.getLastSectionPos();
 
-			for (int i = pos.x() - viewDistance; i <= pos.x() + viewDistance; ++i) {
-				for (int j = pos.z() - viewDistance; j <= pos.z() + viewDistance; ++j) {
-					updateChunkTracking(player, new ChunkPos(i, j), new MutableObject<>(), false, true);
+		// Load the newly entered area.
+		for (int x = newPos.x() - viewDistance - 1; x <= newPos.x() + viewDistance + 1; x++) {
+			for (int z = newPos.z() - viewDistance - 1; z <= newPos.z() + viewDistance + 1; z++) {
+				boolean wasLoaded = oldPos != null && ChunkMap.isChunkInRange(x, z, oldPos.x(), oldPos.z(), viewDistance);
+				boolean shouldLoad = ChunkMap.isChunkInRange(x, z, newPos.x(), newPos.z(), viewDistance);
+				boolean playerLoaded = ChunkMap.isChunkInRange(x, z, playerPos.x(), playerPos.z(), viewDistance);
+
+				if (shouldLoad && !wasLoaded && !playerLoaded) {
+					updateChunkTracking(player, new ChunkPos(x, z), packetCache, false, true);
 				}
 			}
 		}
+
+		camera.setHasSentChunks(true);
 	}
 }
