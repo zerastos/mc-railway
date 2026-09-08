@@ -74,7 +74,6 @@ public class SlabUseOnCurvePacket implements C2SPacket {
         BlockEntity BlockEntity = world.getBlockEntity(pos);
         if (BlockEntity instanceof TrackBlockEntity track) {
             applySettings(player, track);
-            track.notifyUpdate();
         }
     }
 
@@ -139,7 +138,8 @@ public class SlabUseOnCurvePacket implements C2SPacket {
             if (result.shouldSwing())
                 player.swing(hand, true);
 
-            te.notifyUpdate();
+            if (result.consumesAction())
+                te.notifyUpdate();
         }
     }
 }
