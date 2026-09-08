@@ -73,7 +73,7 @@ public class MixinServerLevel {
     )
     private boolean snowInTracks(ServerLevel instance, BlockPos pos, BlockState state, Operation<Boolean> original) {
         if (!(instance.getBlockState(pos).getBlock() instanceof TrackBlock))
-            return instance.setBlockAndUpdate(pos, state);
+            return original.call(instance, pos, state);
 
         if (instance.getBlockEntity(pos) instanceof TrackBlockEntity be && instance.random.nextInt(2) == 0) {
             for (BezierConnection bc : be.getConnections().values()) {
