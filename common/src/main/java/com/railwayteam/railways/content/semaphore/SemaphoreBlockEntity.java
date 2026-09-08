@@ -89,8 +89,12 @@ public class SemaphoreBlockEntity extends SmartBlockEntity implements IOverridab
     public void tick() {
 
         super.tick();
-        if (!level.isClientSide)
+        if (!level.isClientSide) {
+            if (overrideLastingTicks > 0) {
+                overrideLastingTicks--;
+            }
             return;
+        }
 
         if (overrideLastingTicks > 0) {
             overrideLastingTicks--;
