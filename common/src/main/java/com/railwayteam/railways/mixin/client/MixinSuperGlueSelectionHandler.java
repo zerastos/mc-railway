@@ -52,7 +52,7 @@ public class MixinSuperGlueSelectionHandler {
 
     private void controlHighlightsGlue() {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.options.keySprint.isDown()) {
+        if (mc.options.keySprint.isDown() && clusterCooldown == 0 && hoveredPos != null) {
             Set<BlockPos> cluster = SuperGlueSelectionHelper.searchGlueGroup(mc.level, hoveredPos, hoveredPos, true);
             if (cluster != null) {
                 Outliner.getInstance().showCluster(clusterOutlineSlot, cluster)
