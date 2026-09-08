@@ -58,10 +58,12 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
@@ -515,13 +517,13 @@ public class ConductorEntity extends AbstractGolem {
     if (serverLevel != level) {
       return false;
     }
+    if (player.getCamera() instanceof ConductorEntity conductor && conductor != this) {
+      conductor.stopViewing(player);
+    }
     currentlyViewing = new WeakReference<>(player);
     oldSectionPos = null;
     SectionPos chunkPos = SectionPos.of(blockPosition());
     int viewDistance = player.server.getPlayerList().getViewDistance();
-
-    if (player.getCamera() instanceof ConductorEntity conductor)
-      conductor.stopViewing(player);
 
     setChunkLoadingDistance(viewDistance);
 
@@ -540,11 +542,34 @@ public class ConductorEntity extends AbstractGolem {
   }
 
   public void stopViewing(ServerPlayer player) {
-    if (!level.isClientSide) {
-      currentlyViewing.clear();
-      player.camera = player;
-      CRPackets.PACKETS.sendTo(player, new SetCameraViewPacket(player));
-      RECENTLY_DISMOUNTED_PLAYERS.add(player);
+    if (level.isClientSide || player.getCamera() != this)
+      return;
+
+    SectionPos sentCenter = oldSectionPos;
+    SectionPos playerCenter = player.getLastSectionPos();
+    int viewDistance = player.server.getPlayerList().getViewDistance();
+
+    currentlyViewing.clear();
+    oldSectionPos = null;
+    setHasSentChunks(false);
+
+    player.camera = player;
+    CRPackets.PACKETS.sendTo(player, new SetCameraViewPacket(player));
+
+    if (sentCenter != null) {
+      for (int x = sentCenter.x() - viewDistance - 1;
+           x <= sentCenter.x() + viewDistance + 1; x++) {
+        for (int z = sentCenter.z() - viewDistance - 1;
+             z <= sentCenter.z() + viewDistance + 1; z++) {
+          boolean cameraLoaded = ChunkMap.isChunkInRange(
+                  x, z, sentCenter.x(), sentCenter.z(), viewDistance);
+          boolean playerLoaded = ChunkMap.isChunkInRange(
+                  x, z, playerCenter.x(), playerCenter.z(), viewDistance);
+
+          if (cameraLoaded && !playerLoaded)
+            player.connection.send(new ClientboundForgetLevelChunkPacket(x, z));
+        }
+      }
     }
   }
 
