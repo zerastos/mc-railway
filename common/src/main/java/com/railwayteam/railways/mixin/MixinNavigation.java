@@ -328,9 +328,9 @@ public abstract class MixinNavigation implements IWaypointableNavigation, IGener
         MutableObject<TrackSwitch> result = new MutableObject<>(null);
         MutableObject<Boolean> headOn = new MutableObject<>(false);
         MutableObject<SwitchState> targetState = new MutableObject<>(null);
-        double acceleration = train.acceleration();
+        double acceleration = Math.max(train.acceleration(), 1.0E-6);
         double minDistance = 0;//.75f * (train.speed * train.speed) / (2 * acceleration);
-        double maxDistance = Math.max(32, 1.5f * (train.speed * train.speed) / (2 * acceleration));
+        double maxDistance = Mth.clamp(1.5 * (train.speed * train.speed) / (2 * acceleration), 32, 500);
 
         railways$searchGeneral(maxDistance, forward, (distance, cost, reachedVia, currentEntry, trackPoint) -> {
             if (distance < minDistance)
@@ -440,7 +440,7 @@ public abstract class MixinNavigation implements IWaypointableNavigation, IGener
             if (!train.manualTick && Mth.equal(train.speed, 0))
                 return;
 
-            double acceleration = train.acceleration();
+            double acceleration = Math.max(train.acceleration(), 1.0E-6);
             double brakingDistance = (train.speed * train.speed) / (2 * acceleration);
             boolean currentlyBackwards = train.speed < 0 || forceBackwards;
             double speedMod = currentlyBackwards ? -1 : 1;
