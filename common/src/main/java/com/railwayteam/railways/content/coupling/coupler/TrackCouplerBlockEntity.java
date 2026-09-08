@@ -69,6 +69,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -103,8 +104,8 @@ public class TrackCouplerBlockEntity extends SmartBlockEntity implements Transfo
         tag.putInt("AnalogOutput", lastAnalogOutput);
         tag.putInt("EdgeSpacing", edgeSpacing);
         tag.putInt("LastEdgeSpacing", lastEdgeSpacing);
-        //if (clientPacket && clientInfo != null)
-        //    tag.put("ClientInfo", clientInfo.write());
+        if (clientPacket && clientInfo != null)
+            tag.put("ClientInfo", clientInfo.write());
     }
 
     @Override
@@ -116,8 +117,8 @@ public class TrackCouplerBlockEntity extends SmartBlockEntity implements Transfo
         edgeSpacing = tag.getInt("EdgeSpacing");
         lastEdgeSpacing = tag.getInt("LastEdgeSpacing");
         edgeSpacingScroll.setValue(edgeSpacing);
-        //if (clientPacket)
-        //    clientInfo = new ClientInfo(tag.getCompound("ClientInfo"));
+        if (clientPacket && tag.contains("ClientInfo"))
+            clientInfo = new ClientInfo(tag.getCompound("ClientInfo"));
         invalidateRenderBoundingBox();
     }
 
@@ -159,8 +160,9 @@ public class TrackCouplerBlockEntity extends SmartBlockEntity implements Transfo
             notifyUpdate();
         });
 
-        if (getTargetAnalogOutput() != lastAnalogOutput) {
-            lastAnalogOutput = getTargetAnalogOutput();
+        int targetAnalogOutput = getTargetAnalogOutput();
+        if (targetAnalogOutput != lastAnalogOutput) {
+            lastAnalogOutput = targetAnalogOutput;
             level.updateNeighbourForOutputSignal(getBlockPos(), getBlockState().getBlock());
         }
 //        DisplayLinkBlock.notifyGatherers(level, worldPosition);
@@ -202,7 +204,7 @@ public class TrackCouplerBlockEntity extends SmartBlockEntity implements Transfo
 
     private Optional<BlockPos> getDesiredSecondaryEdgePos() {
         BlockState trackState = edgePoint.getTrackBlockState();
-        if (!trackState.hasProperty(TrackBlock.SHAPE))
+        if (trackState == null || !trackState.hasProperty(TrackBlock.SHAPE))
             return Optional.empty();
 
         double distance = -getEdgeSpacing() * edgePoint.getTargetDirection().getStep();
@@ -276,15 +278,18 @@ public class TrackCouplerBlockEntity extends SmartBlockEntity implements Transfo
             clearError2();
             updateOK();
         }
-        clientInfo = new ClientInfo(this);
+        ClientInfo newClientInfo = new ClientInfo(this);
+        boolean clientInfoChanged = !newClientInfo.matches(clientInfo);
+        clientInfo = newClientInfo;
         clearErrors();
-        if (level instanceof ServerLevel serverLevel) {
+        if (clientInfoChanged && level instanceof ServerLevel serverLevel) {
             CRPackets.PACKETS.sendTo(PlayerSelection.tracking(serverLevel, getBlockPos()), new TrackCouplerClientInfoPacket(this));
         }
     }
 
     private boolean isOkExceptGraph() {
-        return cachedTrackState.getBlock() instanceof ITrackBlock && cachedSecondaryTrackState.getBlock() instanceof ITrackBlock &&
+        return cachedTrackState != null && cachedSecondaryTrackState != null &&
+                cachedTrackState.getBlock() instanceof ITrackBlock && cachedSecondaryTrackState.getBlock() instanceof ITrackBlock &&
                 cachedTrackState.hasProperty(TrackBlock.SHAPE) && cachedSecondaryTrackState.hasProperty(TrackBlock.SHAPE) &&
                 cachedTrackState.getValue(TrackBlock.SHAPE) == cachedSecondaryTrackState.getValue(TrackBlock.SHAPE);
     }
@@ -605,6 +610,12 @@ public class TrackCouplerBlockEntity extends SmartBlockEntity implements Transfo
             if (error2 != null)
                 tag.putString("error2", Component.Serializer.toJson(error2));
             return tag;
+        }
+
+        public boolean matches(@Nullable ClientInfo other) {
+            return other != null && mode == other.mode && trainName1.equals(other.trainName1) &&
+                    trainName2.equals(other.trainName2) && edgePointsOk == other.edgePointsOk &&
+                    Objects.equals(error, other.error) && Objects.equals(error2, other.error2);
         }
     }
 
