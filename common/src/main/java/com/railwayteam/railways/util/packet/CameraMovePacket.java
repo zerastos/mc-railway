@@ -74,8 +74,8 @@ public class CameraMovePacket implements C2SPacket, S2CPacket {
             conductor.syncPacketPositionCodec(d0, d1, d2);
             if (true) {
                 conductor.setPos(d0, d1, d2);
-                float f = (float)(packet.getYRot(conductor.getYRot()) * 360) / 256.0F;
-                float f1 = (float)(packet.getXRot(conductor.getXRot()) * 360) / 256.0F;
+                float f = packet.getYRot(conductor.getYRot());
+                float f1 = packet.getXRot(conductor.getXRot());
                 conductor.lerpTo(d0, d1, d2, f, f1, 3, true);
                 conductor.setOnGround(packet.isOnGround());
             }
