@@ -384,6 +384,8 @@ public abstract class MixinNavigation implements IWaypointableNavigation, IGener
     // can't use @Share across methods (lambda$tick$0 and tick count as separate methods)
     @Unique
     private final ThreadLocal<Double> railways$bufferDistance = ThreadLocal.withInitial(() -> Double.MAX_VALUE);
+    @Unique
+    private double railways$manualBufferDistance = Double.MAX_VALUE;
 
     @Inject(method = "tick", at = @At(value = "HEAD"))
     private void resetBufferDistance(Level level, CallbackInfo ci) {
@@ -459,7 +461,7 @@ public abstract class MixinNavigation implements IWaypointableNavigation, IGener
 
             double scanDistance = Mth.clamp(brakingDistanceNoFlicker, preDepartureLookAhead, 500);
 
-            MutableDouble bufferDistance = new MutableDouble(Double.MAX_VALUE);
+            railways$manualBufferDistance = Double.MAX_VALUE;
 
             signalScout.travel(train.graph, (scanDistance + 50) * speedMod, controlSignalScout(),
                 (distance, couple) -> {
@@ -468,17 +470,17 @@ public abstract class MixinNavigation implements IWaypointableNavigation, IGener
                     if (couple.getFirst() instanceof TrackBuffer trackBuffer) {
                         // don't stop *right* on the buffer block, stop a little bit before
                         double bufferedDistance = Math.max(0, distance - TrackBuffer.getBufferRoom(this.train, currentlyBackwards));
-                        bufferDistance.setValue(Math.min(bufferDistance.getValue(), bufferedDistance));
+                        railways$manualBufferDistance = Math.min(railways$manualBufferDistance, bufferedDistance);
                         return true;
                     }
 
                     return false;
                 }, (distance, edge) -> {});
 
-            if (bufferDistance.getValue() >= Double.MAX_VALUE)
+            if (railways$manualBufferDistance >= Double.MAX_VALUE)
                 return;
 
-            double targetDistance = bufferDistance.getValue();
+            double targetDistance = railways$manualBufferDistance;
             targetDistance += 0.25;
 
             /*if (targetDistance - Math.abs(train.speed) < 1 / 32f) {

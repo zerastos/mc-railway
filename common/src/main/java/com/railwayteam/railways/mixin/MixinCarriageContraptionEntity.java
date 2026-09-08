@@ -58,6 +58,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.lang.ref.WeakReference;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -102,6 +103,8 @@ public abstract class MixinCarriageContraptionEntity extends OrientedContraption
     @Inject(method = "control", at = @At(value = "INVOKE", target = "Lcom/simibubi/create/content/trains/entity/Train;maxSpeed()F"))
     private void showSwitchOverlay(BlockPos controlsLocalPos, Collection<Integer> heldControls, Player player,
                                    CallbackInfoReturnable<Boolean> cir) {
+        if (!(player instanceof ServerPlayer))
+            return;
         Navigation nav = carriage.train.navigation;
 
         StructureBlockInfo info = contraption.getBlocks()
@@ -125,10 +128,15 @@ public abstract class MixinCarriageContraptionEntity extends OrientedContraption
         boolean spaceDown = heldControls.contains(4);
 
         double directedSpeed = targetSpeed != 0 ? targetSpeed : carriage.train.speed;
+        boolean previouslySkippingSwitches = MixinVariables.temporarilySkipSwitches;
         MixinVariables.temporarilySkipSwitches = true;
         boolean forward = !carriage.train.doubleEnded || (directedSpeed != 0 ? directedSpeed > 0 : !inverted);
-        Pair<TrackSwitch, Pair<Boolean, Optional<SwitchState>>> lookAheadData = ((IGenerallySearchableNavigation) nav).railways$findNearestApproachableSwitch(forward);
-        MixinVariables.temporarilySkipSwitches = false;
+        Pair<TrackSwitch, Pair<Boolean, Optional<SwitchState>>> lookAheadData;
+        try {
+            lookAheadData = ((IGenerallySearchableNavigation) nav).railways$findNearestApproachableSwitch(forward);
+        } finally {
+            MixinVariables.temporarilySkipSwitches = previouslySkippingSwitches;
+        }
         TrackSwitch lookAhead = lookAheadData == null ? null : lookAheadData.getFirst();
         boolean headOn = lookAheadData != null && lookAheadData.getSecond().getFirst();
         Optional<SwitchState> targetState = lookAheadData == null ? Optional.empty() : lookAheadData.getSecond().getSecond();
@@ -158,11 +166,33 @@ public abstract class MixinCarriageContraptionEntity extends OrientedContraption
 
     @Unique
     boolean railways$switchMessage = false;
+    @Unique
+    private WeakReference<Player> railways$switchMessagePlayer = new WeakReference<>(null);
+    @Unique
+    private SwitchState railways$lastSwitchState;
+    @Unique
+    private boolean railways$lastSwitchAutomatic;
+    @Unique
+    private boolean railways$lastSwitchWrong;
+    @Unique
+    private boolean railways$lastSwitchLocked;
 
     @Unique
     private void displayApproachSwitchMessage(Player player, TrackSwitch sw, boolean isWrong) {
-        sendSwitchInfo(player, sw.getSwitchState(), sw.isAutomatic(), isWrong, sw.isLocked());
+        SwitchState state = sw.getSwitchState();
+        boolean automatic = sw.isAutomatic();
+        boolean locked = sw.isLocked();
+        if (railways$switchMessage && player == railways$switchMessagePlayer.get() &&
+                state == railways$lastSwitchState && automatic == railways$lastSwitchAutomatic &&
+                isWrong == railways$lastSwitchWrong && locked == railways$lastSwitchLocked)
+            return;
+        sendSwitchInfo(player, state, automatic, isWrong, locked);
         railways$switchMessage = true;
+        railways$switchMessagePlayer = new WeakReference<>(player);
+        railways$lastSwitchState = state;
+        railways$lastSwitchAutomatic = automatic;
+        railways$lastSwitchWrong = isWrong;
+        railways$lastSwitchLocked = locked;
     }
 
     @Unique
@@ -172,6 +202,8 @@ public abstract class MixinCarriageContraptionEntity extends OrientedContraption
         if (player instanceof ServerPlayer sp)
             CRPackets.PACKETS.sendTo(sp, SwitchDataUpdatePacket.clear());
         railways$switchMessage = false;
+        railways$switchMessagePlayer.clear();
+        railways$lastSwitchState = null;
     }
 
     @Unique
