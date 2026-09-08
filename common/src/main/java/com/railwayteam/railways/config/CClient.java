@@ -33,7 +33,7 @@ public class CClient extends ConfigBase {
     public final ConfigBool skipClientDerailing = b(false, "skipClientDerailing", Comments.skipClientDerailing);
     public final ConfigBool useConductorSpyShader = b(true, "useConductorSpyShader", Comments.useConductorSpyShader);
     public final ConfigFloat trackOverlayOffset = f(0.0f, -256.0f, 256.0f, "trackOverlayOffset", Comments.trackOverlayOffset);
-    public final ConfigBool useDevCape = b(true, "useDevCape", Comments.useDevCape, Comments.useDevCape2);
+    public final ConfigBool useDevCape = b(false, "useDevCape", Comments.useDevCape, Comments.useDevCape2);
     public final ConfigBool renderNormalCap = b(true, "renderNormalCap", Comments.renderNormalCap);
     public final ConfigBool animatedFlywheels = b(true, "animatedFlywheels", Comments.animatedFlywheels);
     public final ConfigBool universalShadowWrench = b(false, "universalShadowWrench", Comments.universalShadowWrench);

@@ -75,7 +75,7 @@ public class RailwaysClient {
 
     CRFluids.initRendering();
 
-    DevCapeUtils.INSTANCE.init();
+    //DevCapeUtils.INSTANCE.init();
   }
 
   public static void registerReloadCallback(ClientResourceReloadCallback callback) {

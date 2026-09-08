@@ -43,7 +43,7 @@ public class CRCommandsClient {
             .requires(cs -> cs.hasPermission(0))
             .then(ClearCasingCacheCommand.register())
             .then(ClearCapCacheCommand.register())
-            .then(ReloadDevCapesCommand.register())
+            //.then(ReloadDevCapesCommand.register())
             .then(IdentifyTrainCommand.register());
 
         if (Utils.isDevEnv() || FORCE_MIXIN_AUDIT_COMMAND) {
