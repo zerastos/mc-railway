@@ -105,6 +105,7 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import java.lang.ref.WeakReference;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -472,8 +473,11 @@ public class ConductorEntity extends AbstractGolem {
   public int ventCooldown = 0;
 
   public static final List<Player> RECENTLY_DISMOUNTED_PLAYERS = new ArrayList<>();
+  private static final TicketType<ChunkPos> POSSESSION_TICKET = TicketType.create("railways_conductor_possession", Comparator.comparingLong(ChunkPos::toLong), 25);
   @NotNull
   private WeakReference<ServerPlayer> currentlyViewing = new WeakReference<>(null);
+  private ChunkPos possessionTicketCenter = null;
+  private int possessionTicketRefreshTicks = 0;
   private int initialChunkLoadingDistance = 0;
   private boolean hasSentChunks = false;
 
@@ -1075,14 +1079,22 @@ public class ConductorEntity extends AbstractGolem {
       if (fakePlayer == null) {
         fakePlayer = EntityUtils.createConductorFakePlayer(serverLevel, this);
       }
-      if ((Object) currentlyViewing.get() instanceof ServerPlayer player) {
-        SectionPos chunkPos = SectionPos.of(blockPosition());
+      ServerPlayer player = currentlyViewing.get();
+      if (player != null && player.isAlive() && player.getCamera() == this) {
+        ChunkPos chunkPos = new ChunkPos(blockPosition());
         int viewDistance = player.server.getPlayerList().getViewDistance();
-        for (int x = chunkPos.getX() - viewDistance; x <= chunkPos.getX() + viewDistance; x++) {
-          for (int z = chunkPos.getZ() - viewDistance; z <= chunkPos.getZ() + viewDistance; z++) {
-            serverLevel.getChunkSource().addRegionTicket(TicketType.FORCED, new ChunkPos(x, z), 3, new ChunkPos(x, z));
+        if (!chunkPos.equals(possessionTicketCenter) || --possessionTicketRefreshTicks <= 0) {
+          possessionTicketCenter = chunkPos;
+          possessionTicketRefreshTicks = 20;
+          for (int x = chunkPos.x - viewDistance; x <= chunkPos.x + viewDistance; x++) {
+            for (int z = chunkPos.z - viewDistance; z <= chunkPos.z + viewDistance; z++) {
+              ChunkPos ticketPos = new ChunkPos(x, z);
+              serverLevel.getChunkSource().addRegionTicket(POSSESSION_TICKET, ticketPos, 3, ticketPos);
+            }
           }
         }
+      } else if (player != null) {
+        currentlyViewing.clear();
       }
     }
 
