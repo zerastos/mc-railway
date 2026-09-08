@@ -66,6 +66,7 @@ public class MountedToolboxEquipPacket implements C2SPacket {
 	@Override
 	public void handle(ServerPlayer player) {
 		Level world = player.level;
+		if (hotbarSlot < 0 || hotbarSlot >= 9) return;
 
 		if (toolboxCarrierId == null) {
 			ToolboxHandler.unequip(player, hotbarSlot, false);
@@ -73,25 +74,22 @@ public class MountedToolboxEquipPacket implements C2SPacket {
 			return;
 		}
 
+		if (slot < 0 || slot >= 8) return;
+
 		Entity entity = world.getEntity(toolboxCarrierId);
+
+		if (!(entity instanceof ConductorEntity conductorEntity)) return;
 
 		double maxRange = ToolboxHandler.getMaxRange(player);
 		if (player.distanceToSqr(entity) > maxRange
 				* maxRange)
 			return;
-		if (!(entity instanceof ConductorEntity conductorEntity))
-			return;
-
-		ToolboxHandler.unequip(player, hotbarSlot, false);
-
-		if (slot < 0 || slot >= 8) {
-			ToolboxHandler.syncData(player);
-			return;
-		}
 
 		MountedToolbox toolbox = conductorEntity.getToolbox();
 		if (toolbox == null)
 			return;
+
+		ToolboxHandler.unequip(player, hotbarSlot, false);
 
 		ItemStack held = player.getInventory().getItem(hotbarSlot);
 		if (!held.isEmpty()) {

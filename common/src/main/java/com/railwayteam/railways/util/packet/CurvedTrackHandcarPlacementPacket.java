@@ -72,11 +72,14 @@ public class CurvedTrackHandcarPlacementPacket implements C2SPacket {
     }
 
     protected void actuallyHandle(ServerPlayer player, TrackBlockEntity be) {
-        if (player.getInventory().selected != slot)
+        if (slot < 0 || slot >= 9 || player.getInventory().selected != slot)
             return;
         ItemStack stack = player.getInventory().getItem(slot);
         if (!(stack.getItem() instanceof HandcarItem handcarItem))
             return;
+
+        BezierConnection bc = be.getConnections().get(targetPos);
+        if (bc == null) return;
 
         MutableObject<TrackTargetingBlockItem.OverlapResult> result = new MutableObject<>(null);
         MutableObject<TrackGraphLocation> resultLoc = new MutableObject<>(null);
@@ -86,10 +89,11 @@ public class CurvedTrackHandcarPlacementPacket implements C2SPacket {
                 resultLoc.setValue(location);
             });
 
-        BezierConnection bc = be.getConnections().get(targetPos);
         TrackMaterial.TrackType trackType = bc.getMaterial().trackType;
         if (!(trackType == TrackMaterial.TrackType.STANDARD || trackType == CRTrackMaterials.CRTrackType.UNIVERSAL))
             return;
+
+        if (result.getValue() == null) return;
 
         if (result.getValue().feedback != null) {
             player.displayClientMessage(CreateLang.translateDirect(result.getValue().feedback)

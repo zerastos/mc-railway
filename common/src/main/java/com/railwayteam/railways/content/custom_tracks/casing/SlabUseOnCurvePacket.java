@@ -122,6 +122,7 @@ public class SlabUseOnCurvePacket implements C2SPacket {
         Level level = te.getLevel();
         BezierConnection bezierConnection = te.getConnections()
             .get(targetPos);
+        if (bezierConnection == null) return;
 
         if (bezierConnection.getMaterial().trackType == CRTrackMaterials.CRTrackType.MONORAIL) {
             Railways.LOGGER.warn(player.getScoreboardName() + "tried to slab a monorail track");
