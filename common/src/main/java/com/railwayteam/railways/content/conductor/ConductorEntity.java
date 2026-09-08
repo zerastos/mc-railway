@@ -158,11 +158,10 @@ public class ConductorEntity extends AbstractGolem {
     public final @Nullable Couple<Frequency> frequency;
     public int receivedStrength = 0;
 
-    public FrequencyListener(String key) {
+    public FrequencyListener(String key, Couple<Frequency> frequency) {
       this.key = key;
-      this.frequency = ConductorEntity.this.frequencies.entries().get(this.key).orElse(null);
-      if (frequency != null)
-        Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(ConductorEntity.this.level, this);
+      this.frequency = frequency;
+      Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(ConductorEntity.this.level, this);
     }
 
     @Override
@@ -308,7 +307,9 @@ public class ConductorEntity extends AbstractGolem {
       return freqs.map(Frequency::getStack);
     }
 
-    private static Couple<Frequency> stacksToFreq(Couple<ItemStack> stacks) {
+    private static @Nullable Couple<Frequency> stacksToFreq(Couple<ItemStack> stacks) {
+      if (stacks.both(ItemStack::isEmpty))
+        return null;
       return stacks.map(Frequency::of);
     }
 
@@ -773,12 +774,38 @@ public class ConductorEntity extends AbstractGolem {
   protected FrequencyListener sneakListener;
 
   protected void updateFrequencyListeners() {
-    forwardListener = new FrequencyListener("forward");
-    backwardListener = new FrequencyListener("backward");
-    leftListener = new FrequencyListener("left");
-    rightListener = new FrequencyListener("right");
-    jumpListener = new FrequencyListener("jump");
-    sneakListener = new FrequencyListener("sneak");
+    if (level.isClientSide)
+      return;
+    removeFrequencyListeners();
+    if (getJob() != Job.REMOTE_CONTROL)
+      return;
+    forwardListener = createFrequencyListener("forward", frequencies.getForward());
+    backwardListener = createFrequencyListener("backward", frequencies.getBackward());
+    leftListener = createFrequencyListener("left", frequencies.getLeft());
+    rightListener = createFrequencyListener("right", frequencies.getRight());
+    jumpListener = createFrequencyListener("jump", frequencies.getJump());
+    sneakListener = createFrequencyListener("sneak", frequencies.getSneak());
+  }
+
+  private @Nullable FrequencyListener createFrequencyListener(String key, @Nullable Couple<Frequency> frequency) {
+    return frequency == null ? null : new FrequencyListener(key, frequency);
+  }
+
+  private void removeFrequencyListeners() {
+    if (level.isClientSide)
+      return;
+    removeFrequencyListener(forwardListener);
+    removeFrequencyListener(backwardListener);
+    removeFrequencyListener(leftListener);
+    removeFrequencyListener(rightListener);
+    removeFrequencyListener(jumpListener);
+    removeFrequencyListener(sneakListener);
+    forwardListener = backwardListener = leftListener = rightListener = jumpListener = sneakListener = null;
+  }
+
+  private void removeFrequencyListener(@Nullable FrequencyListener listener) {
+    if (listener != null && listener.frequency != null)
+      Create.REDSTONE_LINK_NETWORK_HANDLER.removeFromNetwork(level, listener);
   }
 
   public int getForwardSignalStrength() {
@@ -868,6 +895,7 @@ public class ConductorEntity extends AbstractGolem {
 
   @Override
   public void remove(@NotNull RemovalReason reason) {
+    removeFrequencyListeners();
     super.remove(reason);
     WITH_TOOLBOXES.get(level).remove(this);
   }
@@ -947,6 +975,8 @@ public class ConductorEntity extends AbstractGolem {
   }
 
   public void setJob(Job job) {
+    if (job != Job.REMOTE_CONTROL)
+      removeFrequencyListeners();
     getEntityData().set(JOB, job.ordinal());
   }
 
