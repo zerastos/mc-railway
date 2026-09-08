@@ -68,21 +68,36 @@ public abstract class ChunkMapMixin {
 	 * when they stop viewing a camera
 	 */
 	@Inject(method = "move", at = @At(value = "TAIL"))
-	private void railways$securitycraft$trackCameraLoadedChunks(
-			ServerPlayer player, CallbackInfo callback) {
-		if (!(player.getCamera() instanceof ConductorEntity camera) || camera.hasSentChunks()) {
+	private void railways$securitycraft$trackCameraLoadedChunks(ServerPlayer player, CallbackInfo callback) {
+		if (!(player.getCamera() instanceof ConductorEntity camera)) {
+			// Do not consume the marker while the player is viewing some other camera or spectator entity.
+			if (player.getCamera() == player && ConductorEntity.hasRecentlyDismounted(player)) {
+				SectionPos playerPos = player.getLastSectionPos();
+
+				// Resend the chunks around the player's body once. These chunks may have missed block and block-entity updates during possession.
+				for (int x = playerPos.x() - viewDistance - 1; x <= playerPos.x() + viewDistance + 1; x++) {
+					for (int z = playerPos.z() - viewDistance - 1; z <= playerPos.z() + viewDistance + 1; z++) {
+						if (ChunkMap.isChunkInRange(x, z, playerPos.x(), playerPos.z(), viewDistance)) {
+							updateChunkTracking(player, new ChunkPos(x, z), new MutableObject<>(), false, true);
+						}
+					}
+				}
+			}
+
+			return;
+		}
+
+		if (camera.hasSentChunks()) {
 			return;
 		}
 
 		SectionPos oldPos = camera.oldSectionPos;
 		SectionPos newPos = SectionPos.of(camera);
 		SectionPos playerPos = player.getLastSectionPos();
-		MutableObject<ClientboundLevelChunkWithLightPacket> packetCache = new MutableObject<>();
 
 		camera.oldSectionPos = newPos;
 
-		// Iterate the old area separately. This handles teleports larger than the
-		// view diameter, which the old new-position-only loop missed.
+		// Unload chunks that left the camera's viewing area.
 		if (oldPos != null) {
 			for (int x = oldPos.x() - viewDistance - 1; x <= oldPos.x() + viewDistance + 1; x++) {
 				for (int z = oldPos.z() - viewDistance - 1; z <= oldPos.z() + viewDistance + 1; z++) {
@@ -91,13 +106,13 @@ public abstract class ChunkMapMixin {
 					boolean playerLoaded = ChunkMap.isChunkInRange(x, z, playerPos.x(), playerPos.z(), viewDistance);
 
 					if (wasLoaded && !stillLoaded && !playerLoaded) {
-						updateChunkTracking(player, new ChunkPos(x, z), packetCache, true, false);
+						updateChunkTracking(player, new ChunkPos(x, z), new MutableObject<>(), true, false);
 					}
 				}
 			}
 		}
 
-		// Load the newly entered area.
+		// Load chunks newly entering the camera's viewing area.
 		for (int x = newPos.x() - viewDistance - 1; x <= newPos.x() + viewDistance + 1; x++) {
 			for (int z = newPos.z() - viewDistance - 1; z <= newPos.z() + viewDistance + 1; z++) {
 				boolean wasLoaded = oldPos != null && ChunkMap.isChunkInRange(x, z, oldPos.x(), oldPos.z(), viewDistance);
@@ -105,7 +120,7 @@ public abstract class ChunkMapMixin {
 				boolean playerLoaded = ChunkMap.isChunkInRange(x, z, playerPos.x(), playerPos.z(), viewDistance);
 
 				if (shouldLoad && !wasLoaded && !playerLoaded) {
-					updateChunkTracking(player, new ChunkPos(x, z), packetCache, false, true);
+					updateChunkTracking(player, new ChunkPos(x, z), new MutableObject<>(), false, true);
 				}
 			}
 		}

@@ -481,7 +481,7 @@ public class ConductorEntity extends AbstractGolem {
 
   public int ventCooldown = 0;
 
-  public static final List<Player> RECENTLY_DISMOUNTED_PLAYERS = new ArrayList<>();
+  private static final Set<UUID> RECENTLY_DISMOUNTED_PLAYER_IDS = new HashSet<>();
   private static final TicketType<ChunkPos> POSSESSION_TICKET = TicketType.create("railways_conductor_possession", Comparator.comparingLong(ChunkPos::toLong), 25);
   @NotNull
   private WeakReference<ServerPlayer> currentlyViewing = new WeakReference<>(null);
@@ -505,7 +505,7 @@ public class ConductorEntity extends AbstractGolem {
   public SectionPos oldSectionPos = null;
 
   public static boolean hasRecentlyDismounted(Player player) {
-    return RECENTLY_DISMOUNTED_PLAYERS.remove(player);
+    return RECENTLY_DISMOUNTED_PLAYER_IDS.remove(player.getUUID());
   }
 
   public boolean startViewing(ServerPlayer player) {
@@ -554,6 +554,7 @@ public class ConductorEntity extends AbstractGolem {
     setHasSentChunks(false);
 
     player.camera = player;
+    RECENTLY_DISMOUNTED_PLAYER_IDS.add(player.getUUID());
     CRPackets.PACKETS.sendTo(player, new SetCameraViewPacket(player));
 
     if (sentCenter != null) {
