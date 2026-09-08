@@ -407,6 +407,12 @@ public class ConductorEntity extends AbstractGolem {
   MountedToolbox toolbox = null;
   private List<ItemStack> heldSchedules;
 
+  private @Nullable ServerPlayer getOrCreateFakePlayer() {
+    if (fakePlayer == null && level instanceof ServerLevel serverLevel)
+      fakePlayer = EntityUtils.createConductorFakePlayer(serverLevel, this);
+    return fakePlayer;
+  }
+
   // possession is based on SecurityCraft (MIT license)
   /* Possession variables */
   // keep track of position for packets
@@ -545,7 +551,10 @@ public class ConductorEntity extends AbstractGolem {
   @SuppressWarnings("DuplicatedCode")
   public void onSpyInteract(BlockPos pos) {
     BlockState state;
-    if (this.canReach(pos) && canSpyInteract((state = this.level.getBlockState(pos))) && fakePlayer != null) {
+    if (this.canReach(pos) && canSpyInteract((state = this.level.getBlockState(pos)))) {
+      ServerPlayer fakePlayer = getOrCreateFakePlayer();
+      if (fakePlayer == null)
+        return;
       ClipContext context = new ClipContext(this.getEyePosition(), new Vec3(pos.getX()+0.5, pos.getY()+0.5, pos.getZ()+0.5),
               ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, fakePlayer);
       BlockHitResult hitResult = level.clip(context);
@@ -1106,9 +1115,6 @@ public class ConductorEntity extends AbstractGolem {
     if (ventCooldown > 0)
       ventCooldown--;
     if (level instanceof ServerLevel serverLevel) {
-      if (fakePlayer == null) {
-        fakePlayer = EntityUtils.createConductorFakePlayer(serverLevel, this);
-      }
       ServerPlayer player = currentlyViewing.get();
       if (player != null && player.isAlive() && player.getCamera() == this) {
         ChunkPos chunkPos = new ChunkPos(blockPosition());
@@ -1307,7 +1313,7 @@ public class ConductorEntity extends AbstractGolem {
       targetStrength = pair.getSecond();
       Vec3 target = this.conductor.position().add(targetDirection.scale(2));
       if (conductor.getRootVehicle() instanceof CarriageContraptionEntity cce && cce.getControllingPlayer().isEmpty()
-              && cce.getContraption() instanceof CarriageContraption cc && conductor.fakePlayer != null) {
+              && cce.getContraption() instanceof CarriageContraption cc) {
         BlockPos seat = cc.getSeatOf(conductor.uuid);
         if (seat == null)
           return;
@@ -1354,8 +1360,11 @@ public class ConductorEntity extends AbstractGolem {
           if (right) controls.add(2);*/
           controlsPos = reverseControlsPos;
         }
-        if (!fakeControls.isEmpty())
-          cce.control(controlsPos, fakeControls, conductor.fakePlayer);
+        if (!fakeControls.isEmpty()) {
+          ServerPlayer fakePlayer = conductor.getOrCreateFakePlayer();
+          if (fakePlayer != null)
+            cce.control(controlsPos, fakeControls, fakePlayer);
+        }
 
         Train train = cce.getCarriage().train;
         if (isSprintKeyPressed && honkPacketCooldown-- <= 0) {
@@ -1483,7 +1492,7 @@ public class ConductorEntity extends AbstractGolem {
       BlockPos pos     = this.conductor.getEntityData().get(BLOCK);
       BlockState state = level.getBlockState(pos);
       Block block      = state.getBlock();
-      ServerPlayer fake = this.conductor.fakePlayer;
+      ServerPlayer fake = this.conductor.getOrCreateFakePlayer();
 
       // -- activate a button or lever --
       if (this.conductor.canReach(pos) && this.conductor.canUseBlock(state) && fake != null) {
