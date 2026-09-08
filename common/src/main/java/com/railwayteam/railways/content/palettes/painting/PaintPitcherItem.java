@@ -53,7 +53,9 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.railwayteam.railways.util.ItemUtils.copyStackData;
 import static com.railwayteam.railways.util.ItemUtils.oppositeHand;
@@ -242,8 +244,9 @@ public abstract class PaintPitcherItem extends Item {
         final Vec3 splashSourceVec = splashSource.getCenter();
 
         List<RepaintingTarget> paintTargets = new ArrayList<>();
+        Set<BlockPos> checkedPositions = new HashSet<>();
 
-        final int r = 16;
+        final int r = 8;
         final int rActual = 5;
         for (int x0 = -r; x0 <= r; x0++) {
             for (int y0 = -r; y0 <= r; y0++) {
@@ -270,6 +273,8 @@ public abstract class PaintPitcherItem extends Item {
                         ($) -> null
                     );
                     if (paintTargetPos == null) continue;
+                    paintTargetPos = paintTargetPos.immutable();
+                    if (!checkedPositions.add(paintTargetPos)) continue;
 
                     BlockState state = level.getBlockState(paintTargetPos);
                     RepaintingTarget paintTarget = RepaintingTarget.get(level, paintTargetPos, state);
