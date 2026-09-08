@@ -1065,8 +1065,8 @@ public class ConductorEntity extends AbstractGolem {
   public void tick() {
     this.resetPosition();
     SectionPos sectionPos = SectionPos.of(this);
-    if (!sectionPos.equals(oldSectionPos)) {
-        setHasSentChunks(false);
+    if (oldSectionPos == null || sectionPos.x() != oldSectionPos.x() || sectionPos.z() != oldSectionPos.z()) {
+      setHasSentChunks(false);
     }
     if (level.isClientSide) {
       ConductorPossessionController.tryUpdatePossession(this);
